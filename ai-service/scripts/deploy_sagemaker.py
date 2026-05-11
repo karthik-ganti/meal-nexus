@@ -133,6 +133,20 @@ def deploy_endpoint(sagemaker_client, image_uri, role_arn, endpoint_name, instan
     model_name = endpoint_name
     config_name = f"{endpoint_name}-config"
 
+    # Delete existing model if present (redeploy scenario)
+    try:
+        sagemaker_client.delete_model(ModelName=model_name)
+        print(f"Deleted existing model: {model_name}")
+    except Exception:
+        pass
+
+    # Delete existing endpoint config if present
+    try:
+        sagemaker_client.delete_endpoint_config(EndpointConfigName=config_name)
+        print(f"Deleted existing endpoint config: {config_name}")
+    except Exception:
+        pass
+
     # Create model
     print(f"Creating SageMaker model '{model_name}'...")
     sagemaker_client.create_model(
