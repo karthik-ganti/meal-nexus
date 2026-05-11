@@ -636,7 +636,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Condition: HasCustomDomain
     Properties:
-      HostedZoneId: !Ref Route53HostedZone
+      HostedZoneName: !Sub "${DomainName}."
       Name: !Ref DomainName
       Type: A
       AliasTarget:
@@ -649,7 +649,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Condition: HasCustomDomain
     Properties:
-      HostedZoneId: !Ref Route53HostedZone
+      HostedZoneName: !Sub "${DomainName}."
       Name: !Sub "www.${DomainName}"
       Type: A
       AliasTarget:
