@@ -8,7 +8,7 @@ stack_name = "mealnexus-dev"
 resolve_s3 = true
 s3_prefix = "mealnexus-dev"
 confirm_changeset = false
-capabilities = "CAPABILITY_IAM"
+capabilities = "CAPABILITY_NAMED_IAM"
 parameter_overrides = "Environment=dev DomainName="
 
 [prod.deploy.parameters]
@@ -16,5 +16,5 @@ stack_name = "mealnexus-prod"
 resolve_s3 = true
 s3_prefix = "mealnexus-prod"
 confirm_changeset = false
-capabilities = "CAPABILITY_IAM"
+capabilities = "CAPABILITY_NAMED_IAM"
 parameter_overrides = "Environment=prod DomainName=mealnexus.me"

@@ -87,7 +87,7 @@ jobs:
             --config-env $ENVIRONMENT \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --capabilities CAPABILITY_IAM || {
+            --capabilities CAPABILITY_NAMED_IAM || {
             echo "SAM CLI exited non-zero — verifying CloudFormation stack status..."
             STATUS=$(aws cloudformation describe-stacks \
               --stack-name mealnexus-$ENVIRONMENT \
@@ -250,7 +250,7 @@ jobs:
             --config-env $ENVIRONMENT \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --capabilities CAPABILITY_IAM || {
+            --capabilities CAPABILITY_NAMED_IAM || {
             echo "SAM CLI exited non-zero — verifying CloudFormation stack status..."
             STATUS=$(aws cloudformation describe-stacks \
               --stack-name mealnexus-$ENVIRONMENT \
