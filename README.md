@@ -1,6 +1,6 @@
 # MealNexus — Food Donation Platform
 
-MealNexus is a full-stack web application that connects food donors with NGOs and volunteers to reduce food waste and help feed those in need. The platform features a multi-role system, real-time donation tracking, AI-powered volunteer matching, and comprehensive AWS cloud infrastructure.
+MealNexus is a full-stack web application that connects food donors with NGOs and volunteers to reduce food waste and help feed those in need. The platform features a multi-role system, real-time donation tracking, AI-powered volunteer matching, and a production-grade AWS cloud infrastructure with CloudFront CDN, Route 53 DNS, and ECS Fargate deployment.
 
 ## Features
 
@@ -68,6 +68,9 @@ MealNexus is a full-stack web application that connects food donors with NGOs an
 | Amazon CloudWatch Logs | /ecs/mealnexus-backend-dev/prod, /ecs/mealnexus-frontend-dev/prod | Container logs with 30-day retention |
 | AWS SSM Parameter Store | /mealnexus/{env}/MONGODB_URI, /mealnexus/{env}/JWT_SECRET, /mealnexus/{env}/FAST2SMS_API_KEY | Encrypted production secrets (SecureString) — fetched by ECS at container start |
 | Amazon SageMaker | mealnexus-ranking-dev/prod | Custom BYOC endpoint (ml.t2.medium, 1 instance) |
+| Amazon CloudFront | mealnexus-cdn-dev/prod | Global CDN — HTTPS termination, edge caching for static assets, `/api/*` forwarded uncached to ALB |
+| Amazon Route 53 | mealnexus.me hosted zone | DNS management — A alias records for apex and `www` pointing to CloudFront distribution |
+| AWS Certificate Manager | mealnexus.me + www.mealnexus.me | TLS/SSL certificate (DNS-validated via Route 53, us-east-1 for CloudFront compatibility) |
 
 ### SMS Providers
 | Service | Purpose |
@@ -85,23 +88,34 @@ MealNexus is a full-stack web application that connects food donors with NGOs an
 ## Architecture
 
 ```
-                ┌──────────────────────────────────────────────────┐
- Browser ──►    │  Application Load Balancer  (mealnexus-alb)      │
-                │  /api/*  ──────────►  ECS Backend  (port 5000)   │
-                │  /*      ──────────►  ECS Frontend (port 80)     │
-                └──────────────────────────────────────────────────┘
-                          │ ECS Backend
-                          ├── MongoDB Atlas         (cloud database)
-                          ├── S3                    (photo uploads via presigned URLs)
-                          ├── SQS ──► SNS           (async events → push notifications)
-                          └── AI Ranking (3-tier fallback):
-                               1. SageMaker endpoint   (primary)
-                               2. Lambda + API Gateway  (fallback)
-                               3. Haversine geospatial  (last resort)
+ Browser
+    │  HTTPS
+    ▼
+ Route 53 (mealnexus.me A alias)
+    │
+    ▼
+ CloudFront CDN  ──  edge cache for static assets
+    │  /*  (HTTP → ALB)   │  /api/*  (uncached, all headers forwarded)
+    ▼                      ▼
+ ┌──────────────────────────────────────────────────┐
+ │  Application Load Balancer  (mealnexus-alb)      │
+ │  /api/*  ──────────►  ECS Backend  (port 5000)   │
+ │  /*      ──────────►  ECS Frontend (port 80)     │
+ └──────────────────────────────────────────────────┘
+                    │ ECS Backend
+                    ├── MongoDB Atlas         (cloud database)
+                    ├── S3                    (photo uploads via presigned URLs)
+                    ├── SQS ──► SNS           (async events → push notifications)
+                    └── AI Ranking (3-tier fallback):
+                         1. SageMaker endpoint   (primary)
+                         2. Lambda + API Gateway  (fallback)
+                         3. Haversine geospatial  (last resort)
 
 Secrets:  SSM Parameter Store ──► ECS containers at runtime
 Logs:     ECS containers ──────► CloudWatch Logs (/ecs/mealnexus-*)
 Images:   GitHub Actions ──────► ECR ──────────► ECS rolling deploy
+TLS:      ACM Certificate (DNS-validated) ──────► CloudFront HTTPS
+DNS:      Route 53 hosted zone ─────────────────► Namecheap nameservers
 ```
 
 ## Project Structure
@@ -137,7 +151,8 @@ meal-nexus/
 │       └── test_sagemaker.py        # Endpoint validation
 ├── infrastructure/
 │   ├── template.yaml                # All AWS resources (VPC, ECS, ALB, S3, SQS, SNS,
-│   │                                #   Lambda, API GW, ECR, IAM, CloudWatch, SageMaker role)
+│   │                                #   Lambda, API GW, ECR, IAM, CloudWatch, SageMaker,
+│   │                                #   CloudFront CDN, Route 53, ACM Certificate)
 │   └── samconfig.toml               # [dev] and [prod] deploy configs
 └── .github/workflows/
     └── deploy-aws.yml               # 6-job CI/CD pipeline
@@ -229,7 +244,8 @@ git push
   │       Lint backend + build frontend + install AI deps
   │
   └─ [2] deploy-infra  (SAM → CloudFormation)
-          VPC, ECS cluster, ALB, S3, SQS, SNS, Lambda, API Gateway, ECR repos
+          VPC, ECS cluster, ALB, S3, SQS, SNS, Lambda, API Gateway, ECR repos,
+          CloudFront CDN, Route 53 hosted zone, ACM certificate (if DomainName set)
           │
           ├─ [3] build                    ├─ [4] deploy-sagemaker    ├─ [5] deploy-ai
           │       Docker → ECR            │       SageMaker endpoint  │       Lambda update
@@ -295,7 +311,14 @@ sam build
 sam deploy --config-env dev --no-confirm-changeset --capabilities CAPABILITY_IAM
 ```
 
-**Live dev environment:**
+**To enable CloudFront CDN + Route 53 DNS** (requires a registered domain):
+```bash
+sam deploy --config-env prod --no-confirm-changeset --capabilities CAPABILITY_IAM \
+  --parameter-overrides "Environment=prod DomainName=mealnexus.me"
+```
+After deploying with a domain, copy the **Route53NameServers** output and update your domain registrar (e.g. Namecheap) to point to Route 53. CloudFront's HTTPS URL then becomes your production endpoint.
+
+**Live dev environment (ALB direct):**
 `http://mealnexus-alb-dev-486624458.us-east-1.elb.amazonaws.com`
 
 ## Contributing

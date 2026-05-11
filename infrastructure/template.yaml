@@ -8,6 +8,14 @@ Parameters:
     Default: dev
     AllowedValues: [dev, staging, prod]
 
+  DomainName:
+    Type: String
+    Default: ""
+    Description: "Custom domain (e.g. mealnexus.me). Leave empty to use ALB DNS directly."
+
+Conditions:
+  HasCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
+
 Resources:
   # S3 Bucket
   MealNexusBucket:
@@ -539,6 +547,116 @@ Resources:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
 
+  # Route 53 Hosted Zone (created only when DomainName is provided)
+  Route53HostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: HasCustomDomain
+    Properties:
+      Name: !Ref DomainName
+
+  # ACM TLS Certificate for CloudFront (stack must be deployed in us-east-1)
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: HasCustomDomain
+    DependsOn: Route53HostedZone
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "www.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref Route53HostedZone
+        - DomainName: !Sub "www.${DomainName}"
+          HostedZoneId: !Ref Route53HostedZone
+
+  # CloudFront CDN Distribution — HTTPS termination + edge caching
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: HasCustomDomain
+    DependsOn: SSLCertificate
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "MealNexus ${Environment} CDN"
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Aliases:
+          - !Ref DomainName
+          - !Sub "www.${DomainName}"
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: AlbOrigin
+            DomainName: !GetAtt ApplicationLoadBalancer.DNSName
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        # /api/* — no caching, forward all headers and query strings to backend
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: AlbOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+        # Default — serves React frontend from nginx on ECS; no caching (SPA)
+        DefaultCacheBehavior:
+          TargetOriginId: AlbOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - POST
+            - PATCH
+            - DELETE
+          CachedMethods:
+            - GET
+            - HEAD
+
+  # Route 53 A record: apex domain → CloudFront
+  Route53RecordIPv4:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomDomain
+    Properties:
+      HostedZoneId: !Ref Route53HostedZone
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  # Route 53 A record: www subdomain → CloudFront
+  Route53WwwRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomDomain
+    Properties:
+      HostedZoneId: !Ref Route53HostedZone
+      Name: !Sub "www.${DomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
 Outputs:
   ApiGatewayUrl:
     Description: API Gateway endpoint URL
@@ -571,3 +689,18 @@ Outputs:
   ALBDNSName:
     Description: DNS name of the Application Load Balancer
     Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  CloudFrontDomainName:
+    Condition: HasCustomDomain
+    Description: CloudFront distribution domain (d1234.cloudfront.net)
+    Value: !GetAtt CloudFrontDistribution.DomainName
+
+  CloudFrontURL:
+    Condition: HasCustomDomain
+    Description: HTTPS URL for the application via CloudFront
+    Value: !Sub "https://${DomainName}"
+
+  Route53NameServers:
+    Condition: HasCustomDomain
+    Description: Nameservers — update these at your domain registrar (e.g. Namecheap)
+    Value: !Join [", ", !GetAtt Route53HostedZone.NameServers]
