@@ -1,13 +1,20 @@
 version = 0.1
 
-[default.deploy.parameters]
+[default.global.parameters]
+region = "us-east-1"
+
+[dev.deploy.parameters]
 stack_name = "mealnexus-dev"
 resolve_s3 = true
 s3_prefix = "mealnexus-dev"
-confirm_changeset = true
+confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "Environment=\"dev\""
-image_repositories = []
 
-[default.global.parameters]
-region = "us-east-1"
+[prod.deploy.parameters]
+stack_name = "mealnexus-prod"
+resolve_s3 = true
+s3_prefix = "mealnexus-prod"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Environment=\"prod\""
