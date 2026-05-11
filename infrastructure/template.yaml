@@ -15,10 +15,10 @@ Resources:
     Properties:
       BucketName: !Sub mealnexus-${Environment}-${AWS::AccountId}-${AWS::Region}
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -132,7 +132,8 @@ Resources:
           - Effect: Allow
             Action:
               - sagemaker:InvokeEndpoint
-            Resource: '*'
+            Resource:
+              - !Sub arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/mealnexus-ranking-${Environment}
       Roles:
         - !Ref EcsTaskRole
 
@@ -206,7 +207,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - sagemaker:InvokeEndpoint
-                Resource: '*'
+                Resource:
+                  - !Sub arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/mealnexus-ranking-${Environment}
 
   # VPC and Networking
   VPC:
