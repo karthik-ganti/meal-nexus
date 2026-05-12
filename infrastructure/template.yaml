@@ -18,6 +18,11 @@ Parameters:
     Default: ""
     Description: "Route 53 hosted zone ID for DomainName. Must be pre-created before deploying."
 
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: "ACM certificate ARN (us-east-1, must be ISSUED before deploying CloudFront)."
+
 Conditions:
   HasCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
 
@@ -552,28 +557,12 @@ Resources:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
 
-  # ACM TLS Certificate for CloudFront (stack must be deployed in us-east-1)
-  # HostedZoneId must be pre-created before deploying — CloudFormation EarlyValidation
-  # requires the hosted zone to exist before changeset creation.
-  SSLCertificate:
-    Type: AWS::CertificateManager::Certificate
-    Condition: HasCustomDomain
-    Properties:
-      DomainName: !Ref DomainName
-      SubjectAlternativeNames:
-        - !Sub "www.${DomainName}"
-      ValidationMethod: DNS
-      DomainValidationOptions:
-        - DomainName: !Ref DomainName
-          HostedZoneId: !Ref HostedZoneId
-        - DomainName: !Sub "www.${DomainName}"
-          HostedZoneId: !Ref HostedZoneId
-
   # CloudFront CDN Distribution — HTTPS termination + edge caching
+  # CertificateArn must be pre-created and ISSUED before deploying —
+  # CloudFormation EarlyValidation requires the ACM cert to exist before changeset creation.
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Condition: HasCustomDomain
-    DependsOn: SSLCertificate
     Properties:
       DistributionConfig:
         Enabled: true
@@ -584,7 +573,7 @@ Resources:
           - !Ref DomainName
           - !Sub "www.${DomainName}"
         ViewerCertificate:
-          AcmCertificateArn: !Ref SSLCertificate
+          AcmCertificateArn: !Ref CertificateArn
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
         Origins:
