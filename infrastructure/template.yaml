@@ -119,7 +119,7 @@ Resources:
   SageMakerRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub mealnexus-sagemaker-ranking
+      RepositoryName: !Sub mealnexus-sagemaker-ranking-${Environment}
       ImageScanningConfiguration:
         ScanOnPush: true
 

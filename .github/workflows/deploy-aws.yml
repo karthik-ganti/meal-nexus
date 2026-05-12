@@ -10,7 +10,7 @@ env:
   AWS_REGION: us-east-1
   ECR_BACKEND_REPO: mealnexus-backend-${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
   ECR_FRONTEND_REPO: mealnexus-frontend-${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
-  ECR_SAGEMAKER_REPO: mealnexus-sagemaker-ranking
+  ECR_SAGEMAKER_REPO: mealnexus-sagemaker-ranking-${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
   ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
 
 jobs:
