@@ -17,4 +17,4 @@ resolve_s3 = true
 s3_prefix = "mealnexus-prod"
 confirm_changeset = false
 capabilities = "CAPABILITY_NAMED_IAM"
-parameter_overrides = "Environment=prod DomainName=mealnexus.me"
+parameter_overrides = "Environment=prod DomainName=mealnexus.me HostedZoneId=Z01164992EG1TKXV1T7U2"

@@ -13,6 +13,11 @@ Parameters:
     Default: ""
     Description: "Custom domain (e.g. mealnexus.me). Leave empty to use ALB DNS directly."
 
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: "Route 53 hosted zone ID for DomainName. Must be pre-created before deploying."
+
 Conditions:
   HasCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
 
@@ -547,18 +552,12 @@ Resources:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
 
-  # Route 53 Hosted Zone (created only when DomainName is provided)
-  Route53HostedZone:
-    Type: AWS::Route53::HostedZone
-    Condition: HasCustomDomain
-    Properties:
-      Name: !Ref DomainName
-
   # ACM TLS Certificate for CloudFront (stack must be deployed in us-east-1)
+  # HostedZoneId must be pre-created before deploying — CloudFormation EarlyValidation
+  # requires the hosted zone to exist before changeset creation.
   SSLCertificate:
     Type: AWS::CertificateManager::Certificate
     Condition: HasCustomDomain
-    DependsOn: Route53HostedZone
     Properties:
       DomainName: !Ref DomainName
       SubjectAlternativeNames:
@@ -566,9 +565,9 @@ Resources:
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: !Ref DomainName
-          HostedZoneId: !Ref Route53HostedZone
+          HostedZoneId: !Ref HostedZoneId
         - DomainName: !Sub "www.${DomainName}"
-          HostedZoneId: !Ref Route53HostedZone
+          HostedZoneId: !Ref HostedZoneId
 
   # CloudFront CDN Distribution — HTTPS termination + edge caching
   CloudFrontDistribution:
@@ -636,7 +635,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Condition: HasCustomDomain
     Properties:
-      HostedZoneName: !Sub "${DomainName}."
+      HostedZoneId: !Ref HostedZoneId
       Name: !Ref DomainName
       Type: A
       AliasTarget:
@@ -649,7 +648,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Condition: HasCustomDomain
     Properties:
-      HostedZoneName: !Sub "${DomainName}."
+      HostedZoneId: !Ref HostedZoneId
       Name: !Sub "www.${DomainName}"
       Type: A
       AliasTarget:
@@ -700,7 +699,7 @@ Outputs:
     Description: HTTPS URL for the application via CloudFront
     Value: !Sub "https://${DomainName}"
 
-  Route53NameServers:
+  Route53HostedZoneId:
     Condition: HasCustomDomain
-    Description: Nameservers — update these at your domain registrar (e.g. Namecheap)
-    Value: !Join [", ", !GetAtt Route53HostedZone.NameServers]
+    Description: Route 53 hosted zone ID used for DNS records
+    Value: !Ref HostedZoneId
