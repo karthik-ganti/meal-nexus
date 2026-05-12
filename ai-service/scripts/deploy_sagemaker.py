@@ -34,7 +34,7 @@ import boto3
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 ACCOUNT_ID = os.environ.get("AWS_ACCOUNT_ID", "")
 
-ECR_REPO_NAME = "mealnexus-sagemaker-ranking"
+ECR_REPO_NAME = os.environ.get("ECR_REPO_NAME", "mealnexus-sagemaker-ranking")
 IMAGE_TAG = "latest"
 
 

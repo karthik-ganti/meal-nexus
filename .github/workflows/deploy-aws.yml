@@ -191,6 +191,7 @@ jobs:
   deploy-sagemaker:
     needs: deploy-infra
     runs-on: ubuntu-latest
+    continue-on-error: true
     if: github.event_name == 'push'
     outputs:
       endpoint_name: mealnexus-ranking-${{ env.ENVIRONMENT }}
@@ -237,6 +238,7 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ steps.account.outputs.id }}
           AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REPO_NAME: ${{ env.ECR_SAGEMAKER_REPO }}
         run: |
           python3 scripts/deploy_sagemaker.py \
             --env $ENVIRONMENT \
