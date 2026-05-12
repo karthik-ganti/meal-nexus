@@ -80,25 +80,46 @@ jobs:
         working-directory: infrastructure
         run: sam build
 
-      - name: Deploy SAM application
+      - name: Deploy SAM application (phase 1 — core infra, no CloudFront)
         working-directory: infrastructure
         run: |
+          # Deploy without CloudFront so ALB/VPC/ECS are created first.
+          # CloudFormation EarlyValidation requires the ALB to exist before
+          # a CloudFront distribution can reference it in the same changeset.
+          sam deploy \
+            --config-env $ENVIRONMENT \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides "Environment=$ENVIRONMENT DomainName= HostedZoneId= CertificateArn=" || {
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name mealnexus-$ENVIRONMENT \
+              --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+            echo "Phase 1 CloudFormation stack status: $STATUS"
+            if [[ "$STATUS" =~ (CREATE|UPDATE)_COMPLETE$ ]]; then
+              echo "Phase 1 complete."
+            else
+              echo "Phase 1 failed: $STATUS"; exit 1
+            fi
+          }
+
+      - name: Deploy SAM application (phase 2 — add CloudFront + Route53)
+        working-directory: infrastructure
+        run: |
+          # Now the ALB exists — CloudFront EarlyValidation will pass.
           sam deploy \
             --config-env $ENVIRONMENT \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --capabilities CAPABILITY_NAMED_IAM || {
-            echo "SAM CLI exited non-zero — verifying CloudFormation stack status..."
             STATUS=$(aws cloudformation describe-stacks \
               --stack-name mealnexus-$ENVIRONMENT \
               --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
-            echo "CloudFormation stack status: $STATUS"
+            echo "Phase 2 CloudFormation stack status: $STATUS"
             if [[ "$STATUS" =~ (CREATE|UPDATE)_COMPLETE$ ]]; then
-              echo "Stack is healthy — SAM CLI false-failure, continuing."
-              exit 0
+              echo "Phase 2 complete."
             else
-              echo "Stack is not healthy: $STATUS"
-              exit 1
+              echo "Phase 2 failed: $STATUS"; exit 1
             fi
           }
 
