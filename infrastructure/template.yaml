@@ -431,7 +431,7 @@ Resources:
       TaskRoleArn: !GetAtt EcsTaskRole.Arn
       ContainerDefinitions:
         - Name: backend
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${BackendRepository}:latest
+          Image: node:20-alpine
           PortMappings:
             - ContainerPort: 5000
           Environment:
@@ -479,7 +479,7 @@ Resources:
       ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
       ContainerDefinitions:
         - Name: frontend
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${FrontendRepository}:latest
+          Image: nginx:alpine
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
