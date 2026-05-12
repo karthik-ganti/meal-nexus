@@ -86,8 +86,14 @@ jobs:
           # Deploy without CloudFront so ALB/VPC/ECS are created first.
           # CloudFormation EarlyValidation requires the ALB to exist before
           # a CloudFront distribution can reference it in the same changeset.
+          # Explicit flags (no --config-env) bypass samconfig.toml, which has
+          # DomainName=mealnexus.me in [prod] — empty-string CLI overrides cannot
+          # reliably win against a non-empty samconfig value in SAM CLI.
           sam deploy \
-            --config-env $ENVIRONMENT \
+            --stack-name mealnexus-$ENVIRONMENT \
+            --resolve-s3 \
+            --s3-prefix mealnexus-$ENVIRONMENT \
+            --region us-east-1 \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --capabilities CAPABILITY_NAMED_IAM \
