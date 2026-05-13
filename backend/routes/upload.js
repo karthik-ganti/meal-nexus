@@ -10,7 +10,7 @@ const BUCKET_NAME = process.env.S3_BUCKET_NAME;
 // @route   GET /api/upload/presigned-url
 // @desc    Generate S3 presigned URL for direct upload
 // @access  Private
-router.get('/presigned-url', auth, async (req, res) => {
+router.get('/presigned-url', auth, async (req, res, next) => {
   try {
     const { filename, contentType } = req.query;
 
@@ -19,7 +19,9 @@ router.get('/presigned-url', auth, async (req, res) => {
     }
 
     if (!BUCKET_NAME) {
-      return res.status(500).json({ message: 'S3_BUCKET_NAME not configured' });
+      const err = new Error('S3_BUCKET_NAME not configured');
+      err.code = 'CONFIG_ERROR';
+      return next(err);
     }
 
     const key = `uploads/${Date.now()}_${req.user._id}_${filename}`;
@@ -35,8 +37,7 @@ router.get('/presigned-url', auth, async (req, res) => {
 
     res.json({ uploadUrl, fileUrl, key });
   } catch (error) {
-    console.error('Presigned URL error:', error);
-    res.status(500).json({ message: 'Failed to generate upload URL' });
+    next(error);
   }
 });
 

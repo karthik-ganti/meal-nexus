@@ -6,19 +6,19 @@ const { auth, authorize } = require('../middleware/auth');
 // @route   GET /api/users/profile
 // @desc    Get user profile
 // @access  Private
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/users/profile
 // @desc    Update user profile
 // @access  Private
-router.put('/profile', auth, async (req, res) => {
+router.put('/profile', auth, async (req, res, next) => {
   try {
     const updates = req.body;
     delete updates.password; // Don't update password here
@@ -31,14 +31,14 @@ router.put('/profile', auth, async (req, res) => {
     
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/users/volunteers
 // @desc    Get all volunteers (for NGO assignment)
 // @access  Private (NGO/Admin)
-router.get('/volunteers', auth, authorize('ngo', 'admin'), async (req, res) => {
+router.get('/volunteers', auth, authorize('ngo', 'admin'), async (req, res, next) => {
   try {
     const volunteers = await User.find({ 
       role: 'volunteer',
@@ -47,14 +47,14 @@ router.get('/volunteers', auth, authorize('ngo', 'admin'), async (req, res) => {
     
     res.json(volunteers);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/users/ngos
 // @desc    Get all NGOs
 // @access  Public
-router.get('/ngos', async (req, res) => {
+router.get('/ngos', async (req, res, next) => {
   try {
     const ngos = await User.find({ 
       role: 'ngo',
@@ -63,7 +63,7 @@ router.get('/ngos', async (req, res) => {
     
     res.json(ngos);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

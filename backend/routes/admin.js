@@ -8,7 +8,7 @@ const { auth, authorize } = require('../middleware/auth');
 // @route   GET /api/admin/dashboard
 // @desc    Get admin dashboard stats
 // @access  Private (Admin)
-router.get('/dashboard', auth, authorize('admin'), async (req, res) => {
+router.get('/dashboard', auth, authorize('admin'), async (req, res, next) => {
   try {
     const stats = {
       users: {
@@ -28,14 +28,14 @@ router.get('/dashboard', auth, authorize('admin'), async (req, res) => {
 
     res.json(stats);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/admin/users
 // @desc    Get all users
 // @access  Private (Admin)
-router.get('/users', auth, authorize('admin'), async (req, res) => {
+router.get('/users', auth, authorize('admin'), async (req, res, next) => {
   try {
     const users = await User.find()
       .select('-password')
@@ -43,14 +43,14 @@ router.get('/users', auth, authorize('admin'), async (req, res) => {
     
     res.json(users);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/admin/users/:id/verify
 // @desc    Verify user
 // @access  Private (Admin)
-router.put('/users/:id/verify', auth, authorize('admin'), async (req, res) => {
+router.put('/users/:id/verify', auth, authorize('admin'), async (req, res, next) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -64,14 +64,14 @@ router.put('/users/:id/verify', auth, authorize('admin'), async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/admin/donations
 // @desc    Get all donations
 // @access  Private (Admin)
-router.get('/donations', auth, authorize('admin'), async (req, res) => {
+router.get('/donations', auth, authorize('admin'), async (req, res, next) => {
   try {
     const donations = await Donation.find()
       .populate('donor', 'name email')
@@ -81,14 +81,14 @@ router.get('/donations', auth, authorize('admin'), async (req, res) => {
     
     res.json(donations);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/admin/tasks
 // @desc    Get all tasks with full details
 // @access  Private (Admin)
-router.get('/tasks', auth, authorize('admin'), async (req, res) => {
+router.get('/tasks', auth, authorize('admin'), async (req, res, next) => {
   try {
     const { status } = req.query;
     const filter = status && status !== 'all' ? { status } : {};
@@ -107,19 +107,19 @@ router.get('/tasks', auth, authorize('admin'), async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   DELETE /api/admin/users/:id
 // @desc    Delete a user
 // @access  Private (Admin)
-router.delete('/users/:id', auth, authorize('admin'), async (req, res) => {
+router.delete('/users/:id', auth, authorize('admin'), async (req, res, next) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

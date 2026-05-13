@@ -17,7 +17,7 @@ const generateTempToken = (id) => {
 // @route   POST /api/auth/register
 // @desc    Register new user
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', async (req, res, next) => {
   try {
     const { name, email, password, phone, role, address, organization } = req.body;
 
@@ -53,15 +53,14 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   POST /api/auth/login
 // @desc    Login user (Step 1: Verify credentials, return temp token for OTP)
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -91,15 +90,14 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   POST /api/auth/verify-login-otp
 // @desc    Verify OTP and complete login (Step 2)
 // @access  Public
-router.post('/verify-login-otp', async (req, res) => {
+router.post('/verify-login-otp', async (req, res, next) => {
   try {
     const { tempToken, otpCode } = req.body;
 
@@ -147,15 +145,14 @@ router.post('/verify-login-otp', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
-router.get('/me', auth, async (req, res) => {
+router.get('/me', auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (user) {
@@ -164,8 +161,7 @@ router.get('/me', auth, async (req, res) => {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

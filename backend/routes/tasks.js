@@ -8,7 +8,7 @@ const { createNotification } = require('../utils/notificationHelper');
 // @route   GET /api/tasks
 // @desc    Get tasks for volunteer
 // @access  Private (Volunteer)
-router.get('/', auth, authorize('volunteer'), async (req, res) => {
+router.get('/', auth, authorize('volunteer'), async (req, res, next) => {
   try {
     const tasks = await Task.find({ volunteer: req.user.id })
       .populate('donation')
@@ -16,14 +16,14 @@ router.get('/', auth, authorize('volunteer'), async (req, res) => {
     
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   POST /api/tasks
 // @desc    Create task (assign volunteer)
 // @access  Private (NGO/Admin)
-router.post('/', auth, authorize('ngo', 'admin'), async (req, res) => {
+router.post('/', auth, authorize('ngo', 'admin'), async (req, res, next) => {
   try {
     const { donationId, volunteerId, type } = req.body;
     
@@ -57,14 +57,14 @@ router.post('/', auth, authorize('ngo', 'admin'), async (req, res) => {
 
     res.status(201).json(task);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/tasks/:id/start
 // @desc    Start task
 // @access  Private (Volunteer)
-router.put('/:id/start', auth, authorize('volunteer'), async (req, res) => {
+router.put('/:id/start', auth, authorize('volunteer'), async (req, res, next) => {
   try {
     const task = await Task.findOne({ _id: req.params.id, volunteer: req.user.id });
     
@@ -78,14 +78,14 @@ router.put('/:id/start', auth, authorize('volunteer'), async (req, res) => {
 
     res.json(task);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/tasks/:id/complete
 // @desc    Complete task with proof
 // @access  Private (Volunteer)
-router.put('/:id/complete', auth, authorize('volunteer'), async (req, res) => {
+router.put('/:id/complete', auth, authorize('volunteer'), async (req, res, next) => {
   try {
     const { photo, recipientName, notes } = req.body;
     const task = await Task.findOne({ _id: req.params.id, volunteer: req.user.id });
@@ -134,7 +134,7 @@ router.put('/:id/complete', auth, authorize('volunteer'), async (req, res) => {
 
     res.json(task);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

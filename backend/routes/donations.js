@@ -168,7 +168,7 @@ const handleFileUpload = (files) => {
 // @route   POST /api/donations
 // @desc    Create new donation with photo upload
 // @access  Private (Donor)
-router.post('/', auth, authorize('donor'), async (req, res) => {
+router.post('/', auth, authorize('donor'), async (req, res, next) => {
   try {
     const donationData = {
       donor: req.user._id,
@@ -201,15 +201,14 @@ router.post('/', auth, authorize('donor'), async (req, res) => {
 
     res.status(201).json(donation);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/donations
 // @desc    Get all donations (with filters)
 // @access  Private
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, async (req, res, next) => {
   try {
     const { status, type, priority, myDonations } = req.query;
 
@@ -252,15 +251,14 @@ router.get('/', auth, async (req, res) => {
 
     res.json(donations);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/donations/:id/accept
 // @desc    Accept donation (NGO) with auto-assign volunteer option
 // @access  Private (NGO)
-router.put('/:id/accept', auth, authorize('ngo'), async (req, res) => {
+router.put('/:id/accept', auth, authorize('ngo'), async (req, res, next) => {
   try {
     const { autoAssign } = req.body;
     const donation = await Donation.findById(req.params.id);
@@ -312,15 +310,14 @@ router.put('/:id/accept', auth, authorize('ngo'), async (req, res) => {
 
     res.json(updatedDonation);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/donations/:id/assign-volunteer
 // @desc    Assign volunteer to donation
 // @access  Private (NGO)
-router.put('/:id/assign-volunteer', auth, authorize('ngo'), async (req, res) => {
+router.put('/:id/assign-volunteer', auth, authorize('ngo'), async (req, res, next) => {
   try {
     const { volunteerId } = req.body;
 
@@ -363,14 +360,14 @@ router.put('/:id/assign-volunteer', auth, authorize('ngo'), async (req, res) => 
 
     res.json(updatedDonation);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/donations/:id/status
 // @desc    Update donation status with photo proof
 // @access  Private
-router.put('/:id/status', auth, async (req, res) => {
+router.put('/:id/status', auth, async (req, res, next) => {
   try {
     const { status, notes, photo } = req.body;
     const donation = await Donation.findById(req.params.id);
@@ -424,14 +421,14 @@ router.put('/:id/status', auth, async (req, res) => {
 
     res.json(updatedDonation);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   POST /api/donations/:id/rate
 // @desc    Rate a user (donor, volunteer, or NGO)
 // @access  Private
-router.post('/:id/rate', auth, async (req, res) => {
+router.post('/:id/rate', auth, async (req, res, next) => {
   try {
     const { userId, score, comment } = req.body;
 
@@ -476,8 +473,7 @@ router.post('/:id/rate', auth, async (req, res) => {
       rating
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

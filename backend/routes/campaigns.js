@@ -7,7 +7,7 @@ const { createNotification } = require('../utils/notificationHelper');
 // @route   GET /api/campaigns
 // @desc    Get all campaigns (public)
 // @access  Public
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { status, type, city } = req.query;
     let query = {};
@@ -23,15 +23,14 @@ router.get('/', async (req, res) => {
 
     res.json(campaigns);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   GET /api/campaigns/:id
 // @desc    Get single campaign
 // @access  Public
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const campaign = await Campaign.findById(req.params.id)
       .populate('createdBy', 'name organization email phone')
@@ -43,15 +42,14 @@ router.get('/:id', async (req, res) => {
 
     res.json(campaign);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   POST /api/campaigns
 // @desc    Create a new campaign
 // @access  Private (NGO, Admin)
-router.post('/', auth, authorize('ngo', 'admin'), async (req, res) => {
+router.post('/', auth, authorize('ngo', 'admin'), async (req, res, next) => {
   try {
     const campaignData = {
       ...req.body,
@@ -64,15 +62,14 @@ router.post('/', auth, authorize('ngo', 'admin'), async (req, res) => {
 
     res.status(201).json(populated);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   PUT /api/campaigns/:id
 // @desc    Update campaign
 // @access  Private (Creator or Admin)
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, async (req, res, next) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
 
@@ -93,15 +90,14 @@ router.put('/:id', auth, async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // @route   DELETE /api/campaigns/:id
 // @desc    Delete campaign
 // @access  Private (Creator or Admin)
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, async (req, res, next) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
 
@@ -116,8 +112,7 @@ router.delete('/:id', auth, async (req, res) => {
     await Campaign.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Campaign deleted' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

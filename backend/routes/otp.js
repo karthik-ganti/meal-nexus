@@ -5,7 +5,7 @@ const { createAndSendOtp, verifyOtp } = require('../utils/otpService');
 // @route   POST /api/otp/send
 // @desc    Send OTP to user's phone
 // @access  Public
-router.post('/send', async (req, res) => {
+router.post('/send', async (req, res, next) => {
   try {
     const { phone, purpose } = req.body;
 
@@ -16,15 +16,14 @@ router.post('/send', async (req, res) => {
     const result = await createAndSendOtp(phone, purpose);
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message || 'Error sending OTP' });
+    next(error);
   }
 });
 
 // @route   POST /api/otp/verify
 // @desc    Verify OTP code
 // @access  Public
-router.post('/verify', async (req, res) => {
+router.post('/verify', async (req, res, next) => {
   try {
     const { phone, purpose, code } = req.body;
 
@@ -40,8 +39,7 @@ router.post('/verify', async (req, res) => {
       res.status(400).json({ success: false, message: result.message });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error verifying OTP' });
+    next(error);
   }
 });
 
