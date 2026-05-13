@@ -12,8 +12,11 @@ const awsMessaging = require('./utils/awsMessaging');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Middleware — allow Vercel previews and any configured CORS origin
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : true; // allow all when not configured
+app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
