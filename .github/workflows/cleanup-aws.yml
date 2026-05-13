@@ -1,0 +1,162 @@
+name: Cleanup AWS Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Which environment to delete'
+        required: true
+        type: choice
+        options:
+          - both
+          - prod
+          - dev
+      confirm:
+        description: 'Type DELETE to confirm — this is irreversible'
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DELETE" ]; then
+            echo "Confirmation text was not DELETE. Aborting."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve environments list
+        id: envs
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "both" ]; then
+            echo "list=dev prod" >> $GITHUB_OUTPUT
+          else
+            echo "list=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Delete SageMaker endpoints, configs, and models
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            EP="mealnexus-ranking-$ENV"
+            echo "--- SageMaker: $EP ---"
+            aws sagemaker delete-endpoint --endpoint-name $EP --region $AWS_REGION 2>/dev/null \
+              && echo "Deleted endpoint $EP" || echo "Endpoint $EP not found — skipping"
+            # Wait briefly for endpoint deletion to start before removing config/model
+            sleep 5
+            aws sagemaker delete-endpoint-config --endpoint-config-name ${EP}-config --region $AWS_REGION 2>/dev/null \
+              && echo "Deleted endpoint config ${EP}-config" || echo "Config not found — skipping"
+            aws sagemaker delete-model --model-name $EP --region $AWS_REGION 2>/dev/null \
+              && echo "Deleted model $EP" || echo "Model not found — skipping"
+          done
+
+      - name: Get AWS account ID
+        id: account
+        run: echo "id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+      - name: Empty S3 buckets
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            BUCKET="mealnexus-$ENV-${{ steps.account.outputs.id }}-us-east-1"
+            echo "--- S3: $BUCKET ---"
+            aws s3 rm s3://$BUCKET --recursive 2>/dev/null \
+              && echo "Emptied $BUCKET" || echo "Bucket $BUCKET not found — skipping"
+          done
+
+      - name: Delete all ECR images
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            for REPO in mealnexus-backend-$ENV mealnexus-frontend-$ENV mealnexus-sagemaker-ranking-$ENV; do
+              echo "--- ECR: $REPO ---"
+              IMAGE_IDS=$(aws ecr list-images --repository-name $REPO \
+                --query 'imageIds[*]' --output json 2>/dev/null || echo "[]")
+              if [ "$IMAGE_IDS" != "[]" ] && [ -n "$IMAGE_IDS" ]; then
+                aws ecr batch-delete-image --repository-name $REPO \
+                  --image-ids "$IMAGE_IDS" 2>/dev/null \
+                  && echo "Cleared images from $REPO" || echo "Failed to clear $REPO"
+              else
+                echo "No images in $REPO — skipping"
+              fi
+            done
+          done
+
+      - name: Delete CloudFormation stacks
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            STACK="mealnexus-$ENV"
+            echo "--- CloudFormation: $STACK ---"
+            aws cloudformation delete-stack --stack-name $STACK --region $AWS_REGION 2>/dev/null \
+              && echo "Deletion initiated for $STACK" || echo "Stack $STACK not found — skipping"
+          done
+
+      - name: Wait for stack deletion to complete
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            STACK="mealnexus-$ENV"
+            echo "Waiting for $STACK deletion..."
+            aws cloudformation wait stack-delete-complete --stack-name $STACK \
+              --region $AWS_REGION 2>/dev/null \
+              && echo "$STACK deleted" || echo "$STACK already gone or wait timed out"
+          done
+
+      - name: Delete SSM parameters
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            for PARAM in MONGODB_URI JWT_SECRET FAST2SMS_API_KEY; do
+              aws ssm delete-parameter --name "/mealnexus/$ENV/$PARAM" \
+                --region $AWS_REGION 2>/dev/null \
+                && echo "Deleted /mealnexus/$ENV/$PARAM" || echo "Not found — skipping"
+            done
+          done
+
+      - name: Delete SageMaker IAM roles (created by deploy script, not CloudFormation)
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            ROLE="mealnexus-sagemaker-role-$ENV"
+            echo "--- IAM role: $ROLE ---"
+            aws iam detach-role-policy --role-name $ROLE \
+              --policy-arn arn:aws:iam::aws:policy/AmazonSageMakerFullAccess 2>/dev/null || true
+            aws iam detach-role-policy --role-name $ROLE \
+              --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly 2>/dev/null || true
+            aws iam delete-role --role-name $ROLE 2>/dev/null \
+              && echo "Deleted role $ROLE" || echo "Role not found — skipping"
+          done
+
+      - name: Delete SAM deployment S3 artifacts
+        run: |
+          for ENV in ${{ steps.envs.outputs.list }}; do
+            # SAM uses a managed S3 bucket for deployment artifacts
+            SAM_BUCKET=$(aws s3 ls | grep "aws-sam-cli-managed-default-samclisourcebucket" | awk '{print $3}' | head -1)
+            if [ -n "$SAM_BUCKET" ]; then
+              echo "Removing SAM artifacts for $ENV from $SAM_BUCKET"
+              aws s3 rm s3://$SAM_BUCKET/mealnexus-$ENV/ --recursive 2>/dev/null || true
+            fi
+          done
+
+      - name: Cleanup summary
+        run: |
+          echo ""
+          echo "======================================"
+          echo "  AWS Cleanup Complete"
+          echo "======================================"
+          echo "Environments cleaned: ${{ steps.envs.outputs.list }}"
+          echo ""
+          echo "Deleted resources:"
+          echo "  - SageMaker endpoint / config / model"
+          echo "  - S3 bucket contents"
+          echo "  - ECR image repositories"
+          echo "  - CloudFormation stacks (VPC, ECS, ALB, Lambda, SQS, SNS, CloudFront, Route53)"
+          echo "  - SSM Parameter Store secrets"
+          echo "  - SageMaker IAM roles"
+          echo ""
+          echo "MongoDB Atlas cluster was NOT touched — log in to atlas.mongodb.com to delete if needed."

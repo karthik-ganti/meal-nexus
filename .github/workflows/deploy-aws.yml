@@ -1,10 +1,7 @@
-name: Deploy to AWS
+name: Deploy to AWS (archived — project moved to Render + Vercel)
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
